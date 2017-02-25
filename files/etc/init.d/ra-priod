@@ -1,0 +1,21 @@
+#!/bin/sh /etc/rc.common
+
+START=50
+
+SERVICE_WRITE_PID=1
+SERVICE_DAEMONIZE=1
+
+DAEMON=/usr/sbin/ra-priod
+
+
+start() {
+    if ! ip6tables -L -traw | grep NFQUEUE 
+    then
+	ip6tables-restore < /lib/gluon/ra-priod/ip6tables.rules
+    fi
+    service_start $DAEMON
+}
+
+stop() {
+    service_stop $DAEMON
+}

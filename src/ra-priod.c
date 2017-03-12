@@ -29,7 +29,7 @@
 #define SET_RA_DROP   3
 
 // globale may be set by parameters
-static int cmpMode   = 1;
+static int cmpMode   = 0;
 static char *batIf   = "bat0";
 static char *mainIf  = "br-client"; // not used now!
 static int work_Mode = SET_RA_DROP;
@@ -127,31 +127,39 @@ static void insertReplaceGw(gwl_t *gwl)
 
 static void cleanGwL()
 {
-	gwl_t *act = gwl_root;
-	gwl_t *next= NULL;
+	gwl_t *act  = gwl_root;
+	gwl_t *next = NULL;
+	gwl_t *prev = NULL;
 	while ( act )
 	{
-		next = act->next;
+		//next = act->next;
 		if ( act->state == STATE_OLD)
 		{
+			// delete element
+			next = act->next;
 			if ( act == best )
 			{
 				best = NULL;
 			}
-			next = act->next;
 			if ( act == gwl_root )
 			{
 				gwl_root = next;
+				prev = NULL;
 			}
 #ifdef DEBUG
 		printf("Delete entry %s\n",act->mac);
 #endif
 			free(act);
+			if ( prev )
+			{
+				prev->next = next;
+			}
 			act = next;
 		}
 		else
 		{
-			act = act->next;
+			prev = act;
+			act  = act->next;
 		}
 	}
 }
@@ -225,12 +233,22 @@ void readGwL()
 
 static int macCmp(void *s, char *t)
 {
+#if 1
+	int r1;
+	int r2;
+	r1 = strncmp(s,t,11) == 0 && strncmp(s+15,t+15,2) == 0;
+	r2 =  strncmp(s,t,15) == 0;
+	if ( cmpMode == 0 ) return r1;
+	if ( cmpMode == 1 ) return r2;
+	return r1|r2;
+#else	
 	int r;
 	if ( cmpMode == 0 )
 		r = strncmp(s,t,11) == 0 && strncmp(s+15,t+15,2) == 0;
 	else
 		r = strncmp(s,t,15) == 0;
 	return r;
+#endif
 }
 
 #if 0
@@ -395,12 +413,14 @@ static int handler(struct nfq_q_handle *myQueue, struct nfgenmsg *msg, struct nf
 	if ( check )
 	    return nfq_set_verdict(myQueue, id, NF_ACCEPT, len, pktData);
     }
-
-    if ( !check ) // set prio high
+    else // if ( work_Mode == SET_PRIO_HIGH )
     {
-    	return nfq_set_verdict(myQueue, id, NF_ACCEPT, len, pktData);
+    	if ( !check ) // set prio high
+    	{
+    		return nfq_set_verdict(myQueue, id, NF_ACCEPT, len, pktData);
+   	}
     }
-
+   
     /* Modify paket */
     if (work_Mode == SET_PRIO_LOW )
 	icmp6->icmp6_router_pref = ICMPV6_ROUTER_PREF_LOW;
@@ -448,6 +468,19 @@ static int handler(struct nfq_q_handle *myQueue, struct nfgenmsg *msg, struct nf
     return nfq_set_verdict(myQueue, id, NF_ACCEPT, len, pktData);
 }
 
+void usage(char *name)
+{
+	char *n = strrchr(name,'/');
+	if ( n ) n++;
+	else n = name;
+	printf("Usage: %s [-m l|h|d] [-c 0|1] [-b BatmanInterface]\n",n);
+	printf("\t-m set Priority low (l), hight (h) or delete (d)\n");
+	printf("\t\tRouter Advertisement. Default id d\n");
+	printf("\t-c compare first 4 bytes and last byte (4)\n"); 
+	printf("\t\t5 fist bytes (5) or both checks (b). Default 4\n");
+	printf("\n-b batX (default bat0)");
+}
+
 int main(int argc, char **argv) {
     struct nfq_handle *nfqHandle;
     struct nfq_q_handle *myQueue;
@@ -479,6 +512,7 @@ int main(int argc, char **argv) {
 		{
 		    case '4': cmpMode = 0; break;
 		    case '5': cmpMode = 1; break;
+		    case 'b': cmpMode = 2; break;
 		}
 	    }
 	    break;

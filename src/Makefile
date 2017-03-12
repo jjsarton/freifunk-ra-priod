@@ -1,5 +1,5 @@
 LDFLAGS=-lnetfilter_queue -lnfnetlink -lmnl
-CFLAGS=-Os -Wall -DDEBUG
+CFLAGS=-Os -Wall -DDEBUG -g
 
 all: ra-priod
 

@@ -519,6 +519,7 @@ int main(int argc, char **argv) {
 	    case 'b':batIf = optarg; break;
 	    case 'i': mainIf = optarg; break;
 	    default:
+	    	usage(argv[0]);
 		return 1;
 	}
     }
